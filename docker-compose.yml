@@ -1,0 +1,45 @@
+version: "3"
+services:
+
+  mysql:
+    image: mysql
+    container_name: mysql
+    restart: always
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./mysql-local/init:/docker-entrypoint-initdb.d
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:18.0.0
+    ports:
+      - "9090:8080"
+    depends_on:
+      - mysql
+    entrypoint: ["/bin/bash","-c"]
+    command:
+      - |
+        # additional Script to create Keycloak User
+        nohup ./add-user.sh &
+        # Run Keycloak Server
+        ./opt/keycloak/bin/kc.sh start-dev --import-realm
+    volumes:
+      - ./keycloak-local/realm-export.json:/opt/keycloak/data/import/realm.json:ro
+      - ./keycloak-local/add-user.sh:/add-user.sh
+    environment:
+      KC_DB: mysql
+      KC_DB_URL: jdbc:mysql://mysql/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: password
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      # The Following environment Variables are not from quay.io/keycloak/keycloak Server
+      KC_SERVER: http://localhost:8080
+      KC_SECONDARY_REALM: TestRealm
+      KC_SECONDARY_REALM_CLIENT: login-app
+      KC_SECONDARY_REALM_CLIENT_ROLE: login-role
+      KC_SECONDARY_REALM_CLIENT_USER: testuser
+      KC_SECONDARY_REALM_CLIENT_USER_PASSWORD: testpassword
+    restart: unless-stopped
